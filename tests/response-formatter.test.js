@@ -1,10 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { 
-  textResponse, 
-  structuredResponse, 
-  errorResponse, 
-  resourceLink,
-  multiContentResponse,
+import { describe, it, expect } from 'vitest';
+import {
+  textResponse,
+  structuredResponse,
+  errorResponse,
   createMetadata
 } from '../src/response-formatter.js';
 
@@ -78,70 +76,6 @@ describe('Response Formatter', () => {
         ],
         isError: true
       });
-    });
-  });
-
-  describe('resourceLink', () => {
-    it('should create minimal resource link', () => {
-      const link = resourceLink('file:///test.md', 'test.md');
-      
-      expect(link).toEqual({
-        type: 'resource_link',
-        uri: 'file:///test.md',
-        name: 'test.md'
-      });
-    });
-
-    it('should create full resource link', () => {
-      const link = resourceLink(
-        'file:///test.md', 
-        'test.md',
-        'Test markdown file',
-        'text/markdown'
-      );
-      
-      expect(link).toEqual({
-        type: 'resource_link',
-        uri: 'file:///test.md',
-        name: 'test.md',
-        description: 'Test markdown file',
-        mimeType: 'text/markdown'
-      });
-    });
-  });
-
-  describe('multiContentResponse', () => {
-    it('should create response with multiple content items', () => {
-      const items = [
-        { type: 'text', text: 'Line 1' },
-        { type: 'text', text: 'Line 2' }
-      ];
-      
-      const response = multiContentResponse(items);
-      
-      expect(response).toEqual({
-        content: items
-      });
-    });
-
-    it('should create response with structured content', () => {
-      const items = [{ type: 'text', text: 'Summary' }];
-      const structured = { data: [1, 2, 3] };
-      
-      const response = multiContentResponse(items, structured);
-      
-      expect(response).toEqual({
-        content: items,
-        structuredContent: structured
-      });
-    });
-
-    it('should include metadata when provided', () => {
-      const items = [{ type: 'text', text: 'Test' }];
-      const metadata = { executionTime: 25 };
-      const response = multiContentResponse(items, null, metadata);
-      
-      expect(response._meta).toEqual(metadata);
     });
   });
 

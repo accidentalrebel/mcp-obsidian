@@ -68,50 +68,6 @@ export function errorResponse(error) {
 }
 
 /**
- * Creates a resource link content item
- * @param {string} uri - The resource URI
- * @param {string} name - The resource name
- * @param {string} [description] - Optional description
- * @param {string} [mimeType] - Optional MIME type
- * @returns {object} MCP-compliant resource link
- */
-export function resourceLink(uri, name, description, mimeType) {
-  const link = {
-    type: 'resource_link',
-    uri,
-    name
-  };
-  
-  if (description) link.description = description;
-  if (mimeType) link.mimeType = mimeType;
-  
-  return link;
-}
-
-/**
- * Creates a response with multiple content items
- * @param {Array} items - Array of content items
- * @param {object} [structuredContent] - Optional structured content
- * @param {object} [metadata] - Optional execution metadata
- * @returns {object} MCP-compliant response
- */
-export function multiContentResponse(items, structuredContent = null, metadata = null) {
-  const response = {
-    content: items
-  };
-  
-  if (structuredContent) {
-    response.structuredContent = structuredContent;
-  }
-  
-  if (metadata) {
-    response._meta = metadata;
-  }
-  
-  return response;
-}
-
-/**
  * Creates execution metadata for responses
  * @param {number} startTime - The start time from Date.now()
  * @param {object} [additional] - Additional metadata fields
