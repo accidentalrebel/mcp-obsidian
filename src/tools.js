@@ -198,6 +198,39 @@ export async function listNotes(vaultPath, directory, limit = 100, offset = 0) {
   };
 }
 
+async function resolveNotePath(vaultPath, notePath) {
+  const pathValidation = validatePathWithinBase(vaultPath, notePath);
+  assertValid(pathValidation, (msg) => Errors.accessDenied(msg, { path: notePath }));
+
+  const fullPath = pathValidation.resolvedPath;
+
+  try {
+    await access(fullPath, constants.R_OK);
+    return fullPath;
+  } catch {
+    // Fallback: search by filename
+  }
+
+  const basename = path.basename(notePath);
+  const searchPattern = path.join(vaultPath, '**', basename);
+  const matches = await glob(searchPattern);
+
+  if (matches.length === 0) {
+    throw Errors.resourceNotFound(notePath, { path: notePath });
+  }
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  // Multiple matches - report ambiguity
+  const relativePaths = matches.map(m => path.relative(vaultPath, m)).join(', ');
+  throw Errors.invalidParams(
+    `Ambiguous path "${notePath}" matches multiple notes: ${relativePaths}. Please specify the full path.`,
+    { path: notePath, matches: relativePaths }
+  );
+}
+
 /**
  * Read note content (I/O function with validation)
  */
@@ -205,21 +238,18 @@ export async function readNote(vaultPath, notePath) {
   // Pure validations
   const paramValidation = validateRequiredParameters({ path: notePath }, ['path']);
   assertValid(paramValidation, (msg) => Errors.invalidParams(msg));
-  
+
   const extensionValidation = validateMarkdownExtension(notePath);
   assertValid(extensionValidation, (msg) => Errors.invalidParams(msg, { path: notePath }));
-  
-  const pathValidation = validatePathWithinBase(vaultPath, notePath);
-  assertValid(pathValidation, (msg) => Errors.accessDenied(msg, { path: notePath }));
-  
-  const fullPath = pathValidation.resolvedPath;
-  
-  // I/O: Check file exists and size
+
+  // Resolve path with wikilink-style fallback
+  const fullPath = await resolveNotePath(vaultPath, notePath);
+
+  // I/O: Check file size
   try {
-    await access(fullPath, constants.R_OK);
     const stats = await stat(fullPath);
     const sizeValidation = validateFileSizePure(stats.size, config.limits.maxFileSize);
-    assertValid(sizeValidation, (msg, data) => 
+    assertValid(sizeValidation, (msg, data) =>
       Errors.invalidParams(msg, { path: notePath, ...data })
     );
   } catch (error) {
@@ -228,7 +258,7 @@ export async function readNote(vaultPath, notePath) {
     }
     throw Errors.resourceNotFound(notePath, { path: notePath });
   }
-  
+
   // I/O: Read file
   try {
     const content = await readFile(fullPath, 'utf-8');

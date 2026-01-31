@@ -174,6 +174,9 @@ List all markdown files in your vault or a specific directory.
 
 ### read-note
 Read the complete content of a specific note.
+- **Wikilink-style resolution**: Just provide the filename (e.g., `bitwarden-cli.md`) and the server finds it anywhere in the vault
+- Falls back to exact path if provided (e.g., `Notes/projects/bitwarden-cli.md`)
+- Reports ambiguity if multiple notes share the same filename
 - Path validation ensures security
 - File size limits prevent memory issues
 

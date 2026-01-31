@@ -180,6 +180,38 @@ describe('Tools module', () => {
       await expect(readNote(mockVaultPath, 'missing.md'))
         .rejects.toThrow('Failed to read note');
     });
+
+    it('should resolve note by filename when exact path not found (wikilink-style)', async () => {
+      // Exact path fails, but glob finds the file elsewhere
+      access.mockRejectedValueOnce(new Error('ENOENT'));
+      glob.mockResolvedValue(['/test/vault/projects/note.md']);
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue('# Found Note');
+
+      const result = await readNote(mockVaultPath, 'note.md');
+
+      expect(glob).toHaveBeenCalledWith('/test/vault/**/note.md');
+      expect(result).toBe('# Found Note');
+    });
+
+    it('should throw ambiguity error when multiple matches found', async () => {
+      access.mockRejectedValueOnce(new Error('ENOENT'));
+      glob.mockResolvedValue([
+        '/test/vault/folder1/note.md',
+        '/test/vault/folder2/note.md'
+      ]);
+
+      await expect(readNote(mockVaultPath, 'note.md'))
+        .rejects.toThrow(/Ambiguous path.*matches multiple notes/);
+    });
+
+    it('should throw resource not found when no matches', async () => {
+      access.mockRejectedValueOnce(new Error('ENOENT'));
+      glob.mockResolvedValue([]);
+
+      await expect(readNote(mockVaultPath, 'nonexistent.md'))
+        .rejects.toThrow('Resource not found');
+    });
   });
 
   describe('writeNote', () => {
