@@ -657,6 +657,11 @@ export const toolDefinitions = [
           type: 'string',
           description: 'Limit search to specific directory (optional)',
         },
+        summary: {
+          type: 'boolean',
+          description: 'Return only MOC names, paths, tags, link counts, and linked MOCs (default: true). Set to false to include full linkedNotes arrays.',
+          default: true
+        },
       },
       additionalProperties: false
     },

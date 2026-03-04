@@ -484,7 +484,7 @@ export async function getNoteMetadata(vaultPath, notePath, options = {}) {
  * @returns {Promise<object>} MOCs with their metadata and linked notes
  */
 export async function discoverMocs(vaultPath, options = {}) {
-  const { mocName, directory } = options;
+  const { mocName, directory, summary = true } = options;
 
   // Validate directory path if provided
   if (directory) {
@@ -573,9 +573,14 @@ export async function discoverMocs(vaultPath, options = {}) {
     moc.linkedMocs = linkedMocs;
   });
 
+  // In summary mode, strip linkedNotes to reduce response size
+  const outputMocs = summary
+    ? mocs.map(({ linkedNotes, ...rest }) => rest)
+    : mocs;
+
   return {
-    mocs: mocs,
-    count: mocs.length
+    mocs: outputMocs,
+    count: outputMocs.length
   };
 }
 

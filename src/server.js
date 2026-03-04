@@ -204,8 +204,8 @@ export function createServer(vaultPath) {
       }
 
       case 'discover-mocs': {
-        const { mocName, directory } = args;
-        const result = await discoverMocs(vaultPath, { mocName, directory });
+        const { mocName, directory, summary = true } = args;
+        const result = await discoverMocs(vaultPath, { mocName, directory, summary });
 
         let description = result.count === 0
           ? 'No MOCs found'
@@ -223,7 +223,7 @@ export function createServer(vaultPath) {
           result.mocs.forEach(moc => {
             description += `${moc.title} (${moc.linkCount} linked notes)\n`;
             description += `  Path: ${moc.path}\n`;
-            if (moc.linkedNotes.length > 0) {
+            if (!summary && moc.linkedNotes && moc.linkedNotes.length > 0) {
               description += `  Links: ${moc.linkedNotes.join(', ')}\n`;
             }
             if (moc.linkedMocs && moc.linkedMocs.length > 0) {

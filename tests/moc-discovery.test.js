@@ -62,7 +62,7 @@ tags: [moc, development]
 Just a regular note without MOC tag.
 Contains link to [[something]] but not a MOC.`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs).toHaveLength(2);
       expect(result.count).toBe(2);
@@ -100,7 +100,7 @@ Links with different formats:
 
 Back to [[index]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs).toHaveLength(1);
       const moc = result.mocs[0];
@@ -130,7 +130,7 @@ This uses inline tag instead of frontmatter.
 - [[note1]]
 - [[note2]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs).toHaveLength(1);
       expect(result.mocs[0].title).toBe('Inline MOC');
@@ -150,7 +150,7 @@ tags: moc
 
 No links yet, just a placeholder.`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs).toHaveLength(1);
       expect(result.mocs[0].linkedNotes).toHaveLength(0);
@@ -198,7 +198,7 @@ tags: [moc, test]
 - [[link2]]
 - [[link3]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs[0].linkCount).toBe(3);
       expect(result.mocs[0].linkedNotes).toHaveLength(3);
@@ -301,7 +301,7 @@ tags: moc
 - [[different-note]]
 - [[same-note]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       const linkedNotes = result.mocs[0].linkedNotes;
       expect(linkedNotes).toHaveLength(2);
@@ -344,7 +344,7 @@ tags: moc
 - [[alpha]]
 - [[beta]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       // Links should be in order of appearance (unique)
       expect(result.mocs[0].linkedNotes[0]).toBe('zebra');
@@ -377,7 +377,7 @@ tags: moc
         .mockResolvedValueOnce(`# Regular Note
 No MOC tag here.`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       expect(result.mocs).toHaveLength(2);
 
@@ -405,6 +405,55 @@ tags: moc
       expect(result.mocs[0].linkedMocs).toEqual([]);
     });
 
+    it('should omit linkedNotes by default (summary mode)', async () => {
+      const mockFiles = ['/test/vault/test-moc.md'];
+
+      glob.mockResolvedValue(mockFiles);
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(`---
+tags: [moc, test]
+---
+
+# Test MOC
+
+- [[link1]]
+- [[link2]]
+- [[link3]]`);
+
+      const result = await discoverMocs(mockVaultPath);
+
+      expect(result.mocs).toHaveLength(1);
+      expect(result.mocs[0].linkCount).toBe(3);
+      expect(result.mocs[0]).not.toHaveProperty('linkedNotes');
+      expect(result.mocs[0]).toHaveProperty('path');
+      expect(result.mocs[0]).toHaveProperty('title');
+      expect(result.mocs[0]).toHaveProperty('tags');
+      expect(result.mocs[0]).toHaveProperty('linkedMocs');
+    });
+
+    it('should include linkedNotes when summary is false', async () => {
+      const mockFiles = ['/test/vault/test-moc.md'];
+
+      glob.mockResolvedValue(mockFiles);
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(`---
+tags: [moc, test]
+---
+
+# Test MOC
+
+- [[link1]]
+- [[link2]]
+- [[link3]]`);
+
+      const result = await discoverMocs(mockVaultPath, { summary: false });
+
+      expect(result.mocs).toHaveLength(1);
+      expect(result.mocs[0].linkCount).toBe(3);
+      expect(result.mocs[0].linkedNotes).toHaveLength(3);
+      expect(result.mocs[0].linkedNotes).toContain('link1');
+    });
+
     it('should handle nested path MOC links', async () => {
       const mockFiles = [
         '/test/vault/main-moc.md',
@@ -426,7 +475,7 @@ tags: moc
 # Nested MOC
 - [[something]]`);
 
-      const result = await discoverMocs(mockVaultPath);
+      const result = await discoverMocs(mockVaultPath, { summary: false });
 
       const mainMoc = result.mocs.find(m => m.title === 'Main MOC');
       expect(mainMoc.linkedMocs).toContain('_mocs/nested-moc');
