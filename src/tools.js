@@ -327,12 +327,17 @@ function findSectionBounds(lines, heading) {
  */
 function sortSectionBullets(lines, startIdx, endIdx, sort) {
   const body = lines.slice(startIdx + 1, endIdx);
-  const indexed = body.map((line, i) => ({ line, i, isBullet: /^- /.test(line) }));
+  const hadBlanks = body.some(l => l.trim() === '');
+  // Remove blank lines so they don't interfere with sort positions
+  const content = body.filter(l => l.trim() !== '');
+  const indexed = content.map((line, i) => ({ line, i, isBullet: /^- /.test(line) }));
   const bulletEntries = indexed.filter(e => e.isBullet);
   const sortedBullets = bulletEntries.map(e => e.line)
     .sort((a, b) => sort === 'desc' ? b.localeCompare(a) : a.localeCompare(b));
-  bulletEntries.forEach((entry, j) => { body[entry.i] = sortedBullets[j]; });
-  return body;
+  bulletEntries.forEach((entry, j) => { content[entry.i] = sortedBullets[j]; });
+  // Re-add a single trailing blank line if there were any
+  if (hadBlanks) content.push('');
+  return content;
 }
 
 /**
@@ -351,10 +356,15 @@ function applyEditOperation(text, operation, content, heading, sort) {
 
   let insertIdx;
   if (operation === 'append-to-section') {
-    insertIdx = endIdx;
-    lines.splice(endIdx, 0, content);
+    // Insert before any trailing blank lines so new content stays with section body
+    let insertAt = endIdx;
+    while (insertAt > startIdx + 1 && lines[insertAt - 1].trim() === '') {
+      insertAt--;
+    }
+    insertIdx = insertAt;
+    lines.splice(insertAt, 0, content);
     if (sort && sort !== 'none') {
-      const newEndIdx = endIdx + 1;
+      const newEndIdx = endIdx + 1; // endIdx shifted by one due to splice
       const sorted = sortSectionBullets(lines, startIdx, newEndIdx, sort);
       lines.splice(startIdx + 1, newEndIdx - startIdx - 1, ...sorted);
     }

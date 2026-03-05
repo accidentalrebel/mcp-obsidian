@@ -46,13 +46,48 @@ describe('editNote', () => {
 
       const written = writeFile.mock.calls[0][1];
       const lines = written.split('\n');
-      // '- item c' should appear right before '## Section Two'
+      // '- item c' should appear after existing bullets, before the blank line separator
       const idx = lines.indexOf('- item c');
       expect(idx).toBeGreaterThan(-1);
-      expect(lines[idx + 1]).toBe('## Section Two');
+      expect(lines[idx + 1]).toBe('');        // blank line preserved after new item
+      expect(lines[idx + 2]).toBe('## Section Two');
       expect(context).toContain('- item c');
     });
 
+    it('should not strand new item after blank line separator (orange spacing)', async () => {
+      // Regression: items were being inserted AFTER trailing blanks, so the new
+      // bullet ended up separated from the section body by the blank line.
+      const note = [
+        '## Fruits',
+        '- Apple',
+        '- Banana',
+        '',
+        '## Notes',
+        'Some text',
+      ].join('\n');
+
+      readFile.mockResolvedValue(note);
+      writeFile.mockResolvedValue(undefined);
+
+      await editNote(
+        mockVaultPath, 'note.md', 'append-to-section',
+        '- orange', '## Fruits'
+      );
+
+      const written = writeFile.mock.calls[0][1];
+      const lines = written.split('\n');
+      const orangeIdx = lines.indexOf('- orange');
+      const bananaIdx = lines.indexOf('- Banana');
+      const notesIdx  = lines.indexOf('## Notes');
+
+      // orange must be directly after Banana (no blank line between them)
+      expect(orangeIdx).toBe(bananaIdx + 1);
+      // blank line between section and next heading is preserved
+      expect(lines[orangeIdx + 1]).toBe('');
+      expect(lines[orangeIdx + 2]).toBe('## Notes');
+      // orange must not end up after the blank line
+      expect(orangeIdx).toBeLessThan(notesIdx - 1);
+    });
     it('should sort bullets ascending when sort=asc', async () => {
       const note = [
         '## March',
@@ -76,6 +111,39 @@ describe('editNote', () => {
         '- [[2026-03-02]] Tue',
         '- [[2026-03-03]] Wed',
       ]);
+    });
+
+    it('should handle trailing blank lines when sorting', async () => {
+      const note = [
+        '## Fruits',
+        '- Cherry',
+        '- Apple',
+        '',
+        '## Notes',
+        'Some text',
+      ].join('\n');
+
+      readFile.mockResolvedValue(note);
+      writeFile.mockResolvedValue(undefined);
+
+      await editNote(
+        mockVaultPath, 'note.md', 'append-to-section',
+        '- Banana', '## Fruits', 'asc'
+      );
+
+      const written = writeFile.mock.calls[0][1];
+      const lines = written.split('\n');
+      // Bullets should be together, blank line after, then next heading
+      const appleIdx = lines.indexOf('- Apple');
+      const bananaIdx = lines.indexOf('- Banana');
+      const cherryIdx = lines.indexOf('- Cherry');
+      const notesIdx = lines.indexOf('## Notes');
+      expect(appleIdx).toBeLessThan(bananaIdx);
+      expect(bananaIdx).toBeLessThan(cherryIdx);
+      expect(cherryIdx).toBeLessThan(notesIdx);
+      // Exactly one blank line between last bullet and next heading
+      expect(lines[cherryIdx + 1]).toBe('');
+      expect(lines[cherryIdx + 2]).toBe('## Notes');
     });
 
     it('should sort bullets descending when sort=desc', async () => {
