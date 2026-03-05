@@ -435,6 +435,43 @@ export const toolDefinitions = [
     // Output is just a success message, so no outputSchema
   },
   {
+    name: 'edit-note',
+    title: 'Edit Note',
+    description: 'Edit part of an existing note without rewriting the whole file. Supports appending/prepending to sections by heading text, inserting before a section, or appending to the file.',
+    inputSchema: {
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Path to the note relative to vault root',
+          minLength: 1,
+          pattern: '\\.md$'
+        },
+        operation: {
+          type: 'string',
+          enum: ['append-to-section', 'prepend-to-section', 'insert-before-section', 'append-to-file'],
+          description: 'The edit operation to perform'
+        },
+        content: {
+          type: 'string',
+          description: 'Content to insert'
+        },
+        heading: {
+          type: 'string',
+          description: 'Target heading text including # prefix, e.g. "## Journal References". Required for all section operations.'
+        },
+        sort: {
+          type: 'string',
+          enum: ['asc', 'desc', 'none'],
+          description: 'Sort bullet items in section after appending (lexicographic). Only for append-to-section. Default: none.'
+        }
+      },
+      required: ['path', 'operation', 'content'],
+      additionalProperties: false
+    },
+  },
+  {
     name: 'search-by-tags',
     title: 'Search by Tags',
     description: 'Search for notes by tags (supports both frontmatter and inline tags)',

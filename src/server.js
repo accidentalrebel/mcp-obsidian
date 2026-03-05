@@ -3,7 +3,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { searchVault, searchByTitle, listNotes, readNote, writeNote, deleteNote, searchByTags, getNoteMetadata, discoverMocs } from './tools.js';
+import { searchVault, searchByTitle, listNotes, readNote, writeNote, editNote, deleteNote, searchByTags, getNoteMetadata, discoverMocs } from './tools.js';
 import { toolDefinitions } from './toolDefinitions.js';
 import { Errors, MCPError } from './errors.js';
 import { textResponse, structuredResponse, errorResponse, createMetadata, stripSearchContext } from './response-formatter.js';
@@ -146,10 +146,17 @@ export function createServer(vaultPath) {
         return textResponse(`Note written successfully to ${notePath}`, metadata);
       }
 
+      case 'edit-note': {
+        const { path: notePath, operation, content, heading, sort } = args;
+        const context = await editNote(vaultPath, notePath, operation, content, heading, sort);
+        const metadata = createMetadata(startTime, { tool: 'edit-note', operation });
+        return textResponse(`Note edited (${operation}): ${notePath}\n\nContext:\n${context}`, metadata);
+      }
+
       case 'delete-note': {
         const { path: notePath } = args;
         await deleteNote(vaultPath, notePath);
-        
+
         const metadata = createMetadata(startTime, { tool: 'delete-note' });
         return textResponse(`Note deleted successfully: ${notePath}`, metadata);
       }

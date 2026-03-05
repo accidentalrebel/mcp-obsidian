@@ -305,6 +305,117 @@ export async function writeNote(vaultPath, notePath, content) {
 }
 
 /**
+ * Find the start and end line indices of a section by heading text.
+ * End is next heading of equal or higher level, or EOF.
+ */
+function findSectionBounds(lines, heading) {
+  const headingMatch = heading.match(/^(#+)/);
+  if (!headingMatch) throw Errors.invalidParams(`Invalid heading format: "${heading}"`, { heading });
+  const headingLevel = headingMatch[1].length;
+  const startIdx = lines.findIndex(l => l.trim() === heading.trim());
+  if (startIdx === -1) throw Errors.invalidParams(`Heading not found: "${heading}"`, { heading });
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#+)\s/);
+    if (m && m[1].length <= headingLevel) { endIdx = i; break; }
+  }
+  return { startIdx, endIdx };
+}
+
+/**
+ * Sort single-line bullet items in a section body in-place.
+ */
+function sortSectionBullets(lines, startIdx, endIdx, sort) {
+  const body = lines.slice(startIdx + 1, endIdx);
+  const indexed = body.map((line, i) => ({ line, i, isBullet: /^- /.test(line) }));
+  const bulletEntries = indexed.filter(e => e.isBullet);
+  const sortedBullets = bulletEntries.map(e => e.line)
+    .sort((a, b) => sort === 'desc' ? b.localeCompare(a) : a.localeCompare(b));
+  bulletEntries.forEach((entry, j) => { body[entry.i] = sortedBullets[j]; });
+  return body;
+}
+
+/**
+ * Apply an edit operation to text content. Returns { result, insertIdx }.
+ */
+function applyEditOperation(text, operation, content, heading, sort) {
+  const lines = text.split('\n');
+
+  if (operation === 'append-to-file') {
+    const insertIdx = lines.length;
+    const result = text.endsWith('\n') ? text + content : text + '\n' + content;
+    return { result, insertIdx };
+  }
+
+  const { startIdx, endIdx } = findSectionBounds(lines, heading);
+
+  let insertIdx;
+  if (operation === 'append-to-section') {
+    insertIdx = endIdx;
+    lines.splice(endIdx, 0, content);
+    if (sort && sort !== 'none') {
+      const newEndIdx = endIdx + 1;
+      const sorted = sortSectionBullets(lines, startIdx, newEndIdx, sort);
+      lines.splice(startIdx + 1, newEndIdx - startIdx - 1, ...sorted);
+    }
+  } else if (operation === 'prepend-to-section') {
+    insertIdx = startIdx + 1;
+    lines.splice(startIdx + 1, 0, content);
+  } else if (operation === 'insert-before-section') {
+    insertIdx = startIdx;
+    lines.splice(startIdx, 0, content);
+  } else {
+    throw Errors.invalidParams(`Unknown operation: ${operation}`, { operation });
+  }
+
+  return { result: lines.join('\n'), insertIdx };
+}
+
+/**
+ * Extract a few lines of context around the insertion point.
+ */
+function extractEditContext(text, insertIdx, radius = 3) {
+  const lines = text.split('\n');
+  const start = Math.max(0, insertIdx - radius);
+  const end = Math.min(lines.length, insertIdx + radius + 1);
+  const contextLines = [];
+  for (let i = start; i < end; i++) {
+    contextLines.push(lines[i]);
+  }
+  const prefix = start > 0 ? '...\n' : '';
+  const suffix = end < lines.length ? '\n...' : '';
+  return prefix + contextLines.join('\n') + suffix;
+}
+
+/**
+ * Edit part of an existing note without rewriting the whole file.
+ */
+export async function editNote(vaultPath, notePath, operation, content, heading, sort) {
+  const paramValidation = validateRequiredParameters(
+    { path: notePath, operation, content }, ['path', 'operation', 'content']
+  );
+  assertValid(paramValidation, (msg) => Errors.invalidParams(msg));
+
+  if (operation !== 'append-to-file') {
+    if (!heading) throw Errors.invalidParams('heading is required for section operations');
+  }
+
+  const extensionValidation = validateMarkdownExtension(notePath);
+  assertValid(extensionValidation, (msg) => Errors.invalidParams(msg, { path: notePath }));
+
+  const fullPath = await resolveNotePath(vaultPath, notePath);
+
+  const existingContent = await readFile(fullPath, 'utf-8');
+
+  const sanitizedContent = sanitizeContentPure(content);
+  const { result, insertIdx } = applyEditOperation(existingContent, operation, sanitizedContent, heading, sort);
+
+  await writeFile(fullPath, result, 'utf-8');
+
+  return extractEditContext(result, insertIdx);
+}
+
+/**
  * Delete note (I/O function with validation)
  */
 export async function deleteNote(vaultPath, notePath) {
