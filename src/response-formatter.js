@@ -87,6 +87,56 @@ export function createMetadata(startTime, additional = {}) {
  * @param {object} searchResults - The search results object
  * @returns {object} Search results with context stripped
  */
+/**
+ * Truncates long match content and highlighted text in search results
+ * @param {object} searchResults - The search results object
+ * @param {number} maxLength - Maximum content length before truncation
+ * @returns {object} Search results with truncated content
+ */
+export function truncateMatchContent(searchResults, maxLength = 150) {
+  if (!searchResults || !searchResults.files) {
+    return searchResults;
+  }
+
+  const truncate = (str) => {
+    if (!str || str.length <= maxLength) return str;
+    return str.slice(0, maxLength) + '...';
+  };
+
+  return {
+    ...searchResults,
+    files: searchResults.files.map(file => ({
+      ...file,
+      matches: file.matches.map(match => {
+        const result = { ...match, content: truncate(match.content) };
+        if (match.context) {
+          result.context = {
+            ...match.context,
+            highlighted: truncate(match.context.highlighted)
+          };
+        }
+        return result;
+      })
+    }))
+  };
+}
+
+/**
+ * Compacts search results to only file paths and match counts
+ * @param {object} searchResults - The search results object
+ * @returns {object} Compact search results
+ */
+export function compactSearchResults(searchResults) {
+  if (!searchResults || !searchResults.files) {
+    return searchResults;
+  }
+
+  return {
+    ...searchResults,
+    files: searchResults.files.map(({ path, matchCount }) => ({ path, matchCount }))
+  };
+}
+
 export function stripSearchContext(searchResults) {
   if (!searchResults || !searchResults.files) {
     return searchResults;

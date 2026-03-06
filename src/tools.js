@@ -11,6 +11,7 @@ import { extractTags as extractTagsPure, hasAllTags } from './tags.js';
 import { extractH1Title, titleMatchesQuery, transformTitleResults } from './title-search.js';
 import { extractNoteMetadata, transformBatchMetadata } from './metadata.js';
 import { extractWikilinks, isMoc } from './links.js';
+import { extractHeadings, formatHeadingsOutline } from './headings.js';
 import { 
   validatePathWithinBase, 
   validateMarkdownExtension, 
@@ -234,7 +235,7 @@ async function resolveNotePath(vaultPath, notePath) {
 /**
  * Read note content (I/O function with validation)
  */
-export async function readNote(vaultPath, notePath) {
+export async function readNote(vaultPath, notePath, { heading, headingsOnly } = {}) {
   // Pure validations
   const paramValidation = validateRequiredParameters({ path: notePath }, ['path']);
   assertValid(paramValidation, (msg) => Errors.invalidParams(msg));
@@ -262,8 +263,23 @@ export async function readNote(vaultPath, notePath) {
   // I/O: Read file
   try {
     const content = await readFile(fullPath, 'utf-8');
+
+    if (headingsOnly) {
+      const headings = extractHeadings(content);
+      return headings.length === 0
+        ? '(no headings found)'
+        : formatHeadingsOutline(headings);
+    }
+
+    if (heading) {
+      return extractSection(content, heading);
+    }
+
     return content;
   } catch (error) {
+    if (error instanceof MCPError) {
+      throw error;
+    }
     if (error.code === 'ENOENT') {
       throw Errors.resourceNotFound(notePath, { path: notePath });
     }
@@ -308,7 +324,7 @@ export async function writeNote(vaultPath, notePath, content) {
  * Find the start and end line indices of a section by heading text.
  * End is next heading of equal or higher level, or EOF.
  */
-function findSectionBounds(lines, heading) {
+export function findSectionBounds(lines, heading) {
   const headingMatch = heading.match(/^(#+)/);
   if (!headingMatch) throw Errors.invalidParams(`Invalid heading format: "${heading}"`, { heading });
   const headingLevel = headingMatch[1].length;
@@ -320,6 +336,16 @@ function findSectionBounds(lines, heading) {
     if (m && m[1].length <= headingLevel) { endIdx = i; break; }
   }
   return { startIdx, endIdx };
+}
+
+/**
+ * Extract a section from content by heading text.
+ * Returns text from heading to next same-or-higher-level heading (or EOF).
+ */
+export function extractSection(content, heading) {
+  const lines = content.split('\n');
+  const { startIdx, endIdx } = findSectionBounds(lines, heading);
+  return lines.slice(startIdx, endIdx).join('\n');
 }
 
 /**

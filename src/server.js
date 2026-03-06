@@ -6,7 +6,7 @@ import {
 import { searchVault, searchByTitle, listNotes, readNote, writeNote, editNote, deleteNote, searchByTags, getNoteMetadata, discoverMocs } from './tools.js';
 import { toolDefinitions } from './toolDefinitions.js';
 import { Errors, MCPError } from './errors.js';
-import { textResponse, structuredResponse, errorResponse, createMetadata, stripSearchContext } from './response-formatter.js';
+import { textResponse, structuredResponse, errorResponse, createMetadata, stripSearchContext, truncateMatchContent, compactSearchResults } from './response-formatter.js';
 
 export function createServer(vaultPath) {
   const server = new Server(
@@ -36,7 +36,7 @@ export function createServer(vaultPath) {
     try {
       switch (name) {
       case 'search-vault': {
-        const { query, path: searchPath, caseSensitive = false, includeContext = true, contextLines = 2, limit = 100, offset = 0 } = args;
+        const { query, path: searchPath, caseSensitive = false, includeContext = false, contextLines = 2, limit = 20, offset = 0, compact = true } = args;
         const contextOptions = { includeContext, contextLines };
         const result = await searchVault(vaultPath, query, searchPath, caseSensitive, contextOptions, limit, offset);
 
@@ -49,7 +49,7 @@ export function createServer(vaultPath) {
           description += `\n(Use limit=${limit}, offset=${nextOffset} to get next page)`;
         }
 
-        if (includeContext && result.files.length > 0) {
+        if (!compact && includeContext && result.files.length > 0) {
           description += '\n\n';
           const maxFilesInPreview = 5;
           const filesToShow = result.files.slice(0, maxFilesInPreview);
@@ -79,7 +79,9 @@ export function createServer(vaultPath) {
           filesSearched: result.filesSearched || 0
         });
 
-        const structuredContent = stripSearchContext(result);
+        const structuredContent = compact
+          ? compactSearchResults(result)
+          : stripSearchContext(truncateMatchContent(result));
 
         return structuredResponse(structuredContent, description, metadata);
       }
@@ -124,13 +126,13 @@ export function createServer(vaultPath) {
       }
 
       case 'read-note': {
-        const { path: notePath } = args;
-        const content = await readNote(vaultPath, notePath);
-        
+        const { path: notePath, heading, headings_only: headingsOnly = true } = args;
+        const content = await readNote(vaultPath, notePath, { heading, headingsOnly });
+
         // For read-note, we return the content directly as text
-        const metadata = createMetadata(startTime, { 
+        const metadata = createMetadata(startTime, {
           tool: 'read-note',
-          contentLength: content.length 
+          contentLength: content.length
         });
         return textResponse(content, metadata);
       }

@@ -2,7 +2,7 @@ export const toolDefinitions = [
   {
     name: 'search-vault',
     title: 'Search Vault',
-    description: 'Search for content in Obsidian vault notes. CRITICAL: Multiple space-separated terms default to AND (all required). Use OR for better results: "git OR repository OR backup" finds notes with ANY term. Search progressively: start broad (single key term), then narrow down. Don\'t give up after one try! Supports: boolean operators (AND, OR, NOT), field specifiers (title:, content:, tag:), quoted phrases, parentheses. Examples: "kubernetes OR k8s" (broad), "git OR mirror OR backup" (any match), "title:readme OR tag:important", "(docker OR podman) AND deployment"',
+    description: 'Search for content in Obsidian vault notes. TOKEN-SAVING: Use compact=true (default) for an overview of matching files, then read specific notes. Set compact=false only when you need match content/context. CRITICAL: Multiple space-separated terms default to AND (all required). Use OR for better results: "git OR repository OR backup" finds notes with ANY term. Search progressively: start broad (single key term), then narrow down. Don\'t give up after one try! Supports: boolean operators (AND, OR, NOT), field specifiers (title:, content:, tag:), quoted phrases, parentheses. Examples: "kubernetes OR k8s" (broad), "git OR mirror OR backup" (any match), "title:readme OR tag:important", "(docker OR podman) AND deployment"',
     inputSchema: {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
@@ -23,8 +23,8 @@ export const toolDefinitions = [
         },
         includeContext: {
           type: 'boolean',
-          description: 'Include surrounding lines for context (default: true)',
-          default: true
+          description: 'Include surrounding lines for context (default: false). Only useful when compact=false.',
+          default: false
         },
         contextLines: {
           type: 'integer',
@@ -35,8 +35,8 @@ export const toolDefinitions = [
         },
         limit: {
           type: 'integer',
-          description: 'Maximum number of matches to return (default: 100)',
-          default: 100,
+          description: 'Maximum number of matches to return (default: 20)',
+          default: 20,
           minimum: 1,
           maximum: 500
         },
@@ -45,6 +45,11 @@ export const toolDefinitions = [
           description: 'Number of matches to skip for pagination (default: 0)',
           default: 0,
           minimum: 0
+        },
+        compact: {
+          type: 'boolean',
+          description: 'Return only file paths and match counts (no content). Default: true. Set to false to include match content.',
+          default: true
         }
       },
       required: ['query'],
@@ -373,7 +378,7 @@ export const toolDefinitions = [
   {
     name: 'read-note',
     title: 'Read Note',
-    description: 'Read the content of a specific note',
+    description: 'Read the content of a specific note. TOKEN-SAVING: By default returns only the heading outline. Use heading="## Section Name" to read a specific section. Set headings_only=false to read the full note (only when you need all of it).',
     inputSchema: {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
@@ -383,6 +388,15 @@ export const toolDefinitions = [
           description: 'Path to the note relative to vault root',
           minLength: 1,
           pattern: '\\.md$'
+        },
+        heading: {
+          type: 'string',
+          description: 'Return only this section (e.g. "## Notes"). From heading to next same-or-higher-level heading.'
+        },
+        headings_only: {
+          type: 'boolean',
+          description: 'Return only the heading structure (levels, text, line numbers) instead of full content. Default: true. Set to false to read full content.',
+          default: true
         },
       },
       required: ['path'],

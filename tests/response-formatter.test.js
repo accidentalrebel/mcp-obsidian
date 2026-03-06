@@ -3,7 +3,9 @@ import {
   textResponse,
   structuredResponse,
   errorResponse,
-  createMetadata
+  createMetadata,
+  truncateMatchContent,
+  compactSearchResults
 } from '../src/response-formatter.js';
 
 describe('Response Formatter', () => {
@@ -93,11 +95,96 @@ describe('Response Formatter', () => {
       const startTime = Date.now();
       const additional = { tool: 'test-tool', filesSearched: 42 };
       const metadata = createMetadata(startTime, additional);
-      
+
       expect(metadata.tool).toBe('test-tool');
       expect(metadata.filesSearched).toBe(42);
       expect(metadata).toHaveProperty('executionTime');
       expect(metadata).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('truncateMatchContent', () => {
+    it('should truncate long content', () => {
+      const input = {
+        files: [{
+          path: 'note.md',
+          matchCount: 1,
+          matches: [{
+            line: 1,
+            content: 'A'.repeat(200),
+            context: { highlighted: 'B'.repeat(200) }
+          }]
+        }]
+      };
+
+      const result = truncateMatchContent(input, 150);
+
+      expect(result.files[0].matches[0].content).toBe('A'.repeat(150) + '...');
+      expect(result.files[0].matches[0].context.highlighted).toBe('B'.repeat(150) + '...');
+    });
+
+    it('should leave short content unchanged', () => {
+      const input = {
+        files: [{
+          path: 'note.md',
+          matchCount: 1,
+          matches: [{ line: 1, content: 'short' }]
+        }]
+      };
+
+      const result = truncateMatchContent(input, 150);
+
+      expect(result.files[0].matches[0].content).toBe('short');
+    });
+
+    it('should handle null/empty input', () => {
+      expect(truncateMatchContent(null)).toBeNull();
+      expect(truncateMatchContent({})).toEqual({});
+      expect(truncateMatchContent({ files: [] })).toEqual({ files: [] });
+    });
+
+    it('should handle matches without context', () => {
+      const input = {
+        files: [{
+          path: 'note.md',
+          matchCount: 1,
+          matches: [{ line: 1, content: 'X'.repeat(200) }]
+        }]
+      };
+
+      const result = truncateMatchContent(input, 50);
+
+      expect(result.files[0].matches[0].content).toBe('X'.repeat(50) + '...');
+      expect(result.files[0].matches[0].context).toBeUndefined();
+    });
+  });
+
+  describe('compactSearchResults', () => {
+    it('should return only paths and match counts', () => {
+      const input = {
+        files: [{
+          path: 'note.md',
+          matchCount: 3,
+          matches: [
+            { line: 1, content: 'some content' },
+            { line: 5, content: 'more content' },
+            { line: 10, content: 'even more' }
+          ]
+        }],
+        totalMatches: 3,
+        fileCount: 1
+      };
+
+      const result = compactSearchResults(input);
+
+      expect(result.files).toEqual([{ path: 'note.md', matchCount: 3 }]);
+      expect(result.totalMatches).toBe(3);
+      expect(result.fileCount).toBe(1);
+    });
+
+    it('should handle null/empty input', () => {
+      expect(compactSearchResults(null)).toBeNull();
+      expect(compactSearchResults({})).toEqual({});
     });
   });
 });

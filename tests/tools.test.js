@@ -212,6 +212,87 @@ describe('Tools module', () => {
       await expect(readNote(mockVaultPath, 'nonexistent.md'))
         .rejects.toThrow('Resource not found');
     });
+
+    it('should return section content when heading provided', async () => {
+      const noteContent = '# Title\n\nIntro\n\n## Notes\n\nNote content here\n\n## References\n\nRef content';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md', { heading: '## Notes' });
+
+      expect(result).toBe('## Notes\n\nNote content here\n');
+    });
+
+    it('should return full content when heading omitted', async () => {
+      const noteContent = '# Title\n\nContent';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md');
+
+      expect(result).toBe(noteContent);
+    });
+
+    it('should throw on invalid heading', async () => {
+      const noteContent = '# Title\n\n## Section\n\nContent';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      await expect(readNote(mockVaultPath, 'test.md', { heading: '## Missing' }))
+        .rejects.toThrow('Heading not found');
+    });
+
+    it('should return last section to EOF', async () => {
+      const noteContent = '# Title\n\n## First\n\nFirst content\n\n## Last\n\nLast content\nMore last';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md', { heading: '## Last' });
+
+      expect(result).toBe('## Last\n\nLast content\nMore last');
+    });
+
+    it('should include sub-headings within section', async () => {
+      const noteContent = '# Title\n\n## Section\n\n### Sub1\n\nSub1 content\n\n### Sub2\n\nSub2 content\n\n## Next';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md', { heading: '## Section' });
+
+      expect(result).toContain('### Sub1');
+      expect(result).toContain('### Sub2');
+      expect(result).not.toContain('## Next');
+    });
+
+    it('should return heading outline when headings_only is true', async () => {
+      const noteContent = '# Title\n\nIntro\n\n## Notes\n\nContent\n\n### Details\n\nMore';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md', { headingsOnly: true });
+
+      expect(result).toContain('# Title (line 1)');
+      expect(result).toContain('## Notes (line 5)');
+      expect(result).toContain('### Details (line 9)');
+      expect(result).not.toContain('Content');
+    });
+
+    it('should return placeholder when headings_only but no headings found', async () => {
+      const noteContent = 'Just plain text\nNo headings here';
+      access.mockResolvedValue();
+      stat.mockResolvedValue({ size: 1024 });
+      readFile.mockResolvedValue(noteContent);
+
+      const result = await readNote(mockVaultPath, 'test.md', { headingsOnly: true });
+
+      expect(result).toBe('(no headings found)');
+    });
   });
 
   describe('writeNote', () => {
