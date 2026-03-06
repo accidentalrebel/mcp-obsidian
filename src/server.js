@@ -126,7 +126,7 @@ export function createServer(vaultPath) {
       }
 
       case 'read-note': {
-        const { path: notePath, heading, headings_only: headingsOnly = true } = args;
+        const { path: notePath, heading, headings_only: headingsOnly = heading ? false : true } = args;
         const content = await readNote(vaultPath, notePath, { heading, headingsOnly });
 
         // For read-note, we return the content directly as text
